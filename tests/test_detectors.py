@@ -208,3 +208,27 @@ class TestUtilities:
         # But overlapping dedup should prevent triple-counting
         kinds = [f.kind for f in findings if f.kind == "api_key"]
         assert len(kinds) <= 2
+
+def test_ssh_user_prose_does_not_false_positive():
+    """Prose like 'SSH account names' or 'ssh login' must NOT trigger."""
+    from guardrails.detectors import scan as scan_text
+
+    prose = (
+        "The plugin scans SSH account names and login credentials. "
+        "Use ssh login for the remote host. Account names are case-sensitive."
+    )
+    findings = scan_text(prose)
+    kinds = [f.kind for f in findings]
+    assert "ssh_user" not in kinds, f"prose triggered ssh_user: {findings}"
+
+
+def test_ssh_user_real_username_still_detected():
+    """Real account names (digit/underscore or known) still detected."""
+    from guardrails.detectors import scan as scan_text
+
+    text = "ssh hermes_zum@host; user: root; username=deploy"
+    findings = scan_text(text)
+    kinds = [f.kind for f in findings]
+    assert "ssh_user" in kinds
+    vals = [f.value for f in findings if f.kind == "ssh_user"]
+    assert any("hermes_zum" in v for v in vals), vals

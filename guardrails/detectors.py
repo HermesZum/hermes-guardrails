@@ -90,6 +90,27 @@ _SSH_USER_RE = re.compile(
     re.IGNORECASE | re.VERBOSE,
 )
 
+# Known common account names — always treated as credentials when captured.
+_KNOWN_USERNAMES = {
+    "root", "admin", "deploy", "ubuntu", "ec2-user", "pi", "git",
+    "postgres", "www-data", "nobody", "hermes", "agent", "oracle",
+}
+
+
+def _looks_like_username(name: str) -> bool:
+    """True if the captured word looks like a real account name.
+
+    Accepts known common usernames, or any word containing a digit or
+    underscore (e.g. ``hermes_zum``, ``user123``). Rejects prose words
+    like "account" or "login".
+    """
+    if not name:
+        return False
+    if name.lower() in _KNOWN_USERNAMES:
+        return True
+    return any(ch.isdigit() or ch == "_" for ch in name)
+
+
 # Email addresses
 _EMAIL_RE = re.compile(
     r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"
@@ -211,6 +232,9 @@ def scan(text: str) -> list[Finding]:
     # SSH usernames (medium — context-dependent)
     for m in _SSH_USER_RE.finditer(text):
         group = 1 if m.group(1) else 2
+        name = m.group(group) or ""
+        if not _looks_like_username(name):
+            continue
         _add("ssh_user", m, Severity.MEDIUM, group=group)
 
     # Hostnames (medium — context-dependent)
