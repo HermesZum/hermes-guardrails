@@ -218,11 +218,18 @@ def _is_public_repo_context(
             return True
 
     # Check if the path/command references a public repo directory
-    # (heuristic: check for known repo directory names)
+    # (match full "org/repo" OR the bare directory basename, e.g.
+    #  /root/hermes-guardrails/... for agent-community/hermes-guardrails)
     for key in ("path", "workdir"):
         val = args.get(key, "")
-        if val and any(repo in val for repo in config.public_repos):
-            return True
+        if not val:
+            continue
+        for repo in config.public_repos:
+            if repo in val:
+                return True
+            basename = repo.split("/")[-1]
+            if basename and basename in val.split("/"):
+                return True
 
     return False
 

@@ -18,9 +18,33 @@ class TestEvaluateWriteFile:
 
     def test_phone_in_public_repo_blocked(self):
         config = RuleConfig(public_repos={"myorg/myrepo"})
-        content = "Call +351555123456 in myorg/myrepo"
+        content = "Call +351 555 123 456 in myorg/myrepo"
         result = evaluate("write_file", {"content": content}, config)
         assert result.should_block
+
+    def test_phone_blocked_by_basename_path(self):
+        # Regression: local paths use the bare directory basename
+        # (/root/myrepo/...) not the full "org/repo" name
+        config = RuleConfig(public_repos={"myorg/myrepo"})
+        content = "Call +351 555 123 456"
+        result = evaluate(
+            "write_file",
+            {"content": content, "path": "/root/myrepo/test_pii.txt"},
+            config,
+        )
+        assert result.should_block, "basename path match must trigger block"
+
+    def test_phone_not_blocked_in_similar_dirname(self):
+        # Basename match must be an exact path segment, not a substring:
+        # /root/myrepo-backup/ must NOT match repo "myorg/myrepo"
+        config = RuleConfig(public_repos={"myorg/myrepo"})
+        content = "Call +351 555 123 456"
+        result = evaluate(
+            "write_file",
+            {"content": content, "path": "/root/myrepo-backup/test.txt"},
+            config,
+        )
+        assert not result.should_block
 
     def test_phone_not_blocked_in_private_context(self):
         config = RuleConfig()
